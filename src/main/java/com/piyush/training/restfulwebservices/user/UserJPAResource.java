@@ -20,44 +20,68 @@ import static org.springframework.hateoas.mvc.ControllerLinkBuilder.methodOn;
  * Created by piyush.panda on 14/10/2018.
  */
 @RestController
-public class UserResource {
+public class UserJPAResource {
 
     @Autowired
     private UseDaoService useDaoService;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PostRepository postRepository;
+
     //Get users
     //retrieveALlusers
-    @GetMapping("/users")
+    @GetMapping("/jpa/users")
     public List<User> retriveAllUsers(){
-        return useDaoService.findAll();
+        return userRepository.findAll();
     }
 
-    @GetMapping("/users/{id}")
+    @GetMapping("/jpa/users/{id}")
     public Resource<User> retrieveUser(@PathVariable int id) {
-        User user = useDaoService.findUser(id);
-        if(user == null){
+        Optional<User> user = userRepository.findById(id);
+        if(!user.isPresent()){
             throw new UserNotFoundException("id -" +id);
         }
 
-        Resource<User> resource = new Resource<>(user);
+        Resource<User> resource = new Resource<>(user.get());
         ControllerLinkBuilder linkTo = linkTo(methodOn(this.getClass()).retriveAllUsers());
         resource.add(linkTo.withRel("all-users"));
         return resource;
     }
 
-    @PostMapping("/users")
+    @PostMapping("/jpa/users")
     public ResponseEntity<Object> createUser(@Valid @RequestBody User user) {
-        User savedUser = useDaoService.save(user);
+        User savedUser = userRepository.save(user);
         URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(savedUser.getId()).toUri();
         return ResponseEntity.created(uri).build();
     }
 
-    @DeleteMapping("/users/{id}")
+    @DeleteMapping("/jpa/users/{id}")
     public void deleteUser(@PathVariable int id) {
-        boolean deleted = useDaoService.deleteUser(id);
-        if(!deleted){
-            throw new UserNotFoundException("id -" +id);
-        }
+        userRepository.deleteById(id);
     }
 
+    @GetMapping("/jpa/users/{id}/posts")
+    public User retrieveUserPosts(@PathVariable int id) {
+        return getUser(id);
+    }
+
+    @PostMapping("/jpa/users/{id}/posts")
+    public ResponseEntity<Object> createPost(@PathVariable int id, @RequestBody Post post) {
+        User user = getUser(id);
+        post.setUser(user);
+        postRepository.save(post);
+        URI uri = ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(post.getId()).toUri();
+        return ResponseEntity.created(uri).build();
+    }
+
+    private User getUser(@PathVariable int id) {
+        Optional<User> user = userRepository.findById(id);
+        if(!user.isPresent()){
+            throw new UserNotFoundException("id -" +id);
+        }
+        return user.get();
+    }
 }
